@@ -315,10 +315,8 @@
     this.cardsByAppID[app.instanceID] = card;
     this.cardsList.appendChild(card.render());
 
-    if (position >= this.position - 2 && position <= this.position + 2) {
-      card.element.style.display = 'block';
-    } else {
-      card.element.style.display = 'none';
+    if (position <= this.position - 2 || position >= this.position + 2) {
+      card.element.style.visibility = 'hidden';
     }
   };
 
@@ -426,11 +424,15 @@
 
     if (this._shouldGoBackHome) {
       app = app || homescreenLauncher.getHomescreen(true);
-    } else {
-      app = app || this.unfilteredStack[this.position];
+    } else if (!app) {
+      app = this.stack ? this.stack[this.position] :
+                         homescreenLauncher.getHomescreen(true);
     }
 
-    var position = this.unfilteredStack.indexOf(app);
+    // to know if position has changed we need index into original stack,
+    var position = this.unfilteredStack ? this.unfilteredStack.indexOf(app) :
+                                          -1;
+
     if (position !== StackManager.position) {
       this.newStackPosition = position;
     }
@@ -882,9 +884,7 @@
       var card = self.cardsByAppID[app.instanceID];
 
       if (idx < position - 2 || idx > position + 2) {
-        window.mozRequestAnimationFrame(function() {
-          card.element.style.display = 'none';
-        });
+        card.element.style.visibility = 'hidden';
         return;
       }
 
@@ -892,7 +892,7 @@
       // transitions durations/delays to account for the layer trickery.
       // Layer Trickery: nf, cards that should be completely outside the
       // viewport but are in fact 0.001 pixel in.
-      card.element.style.display = 'block';
+      card.element.style.visibility = '';
 
       var distance = card.element.dataset.keepLayerDelta;
       var currentCardDistance = Math.abs(currentCard.element.dataset.positionX);

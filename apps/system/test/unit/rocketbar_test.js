@@ -106,7 +106,8 @@ suite('system/Rocketbar', function() {
   });
 
   test('focus()', function() {
-    var loadSearchAppStub = this.sinon.stub(subject, 'loadSearchApp');
+    var loadSearchAppStub = this.sinon.stub(subject, 'loadSearchApp')
+      .returns(Promise.resolve());
     subject.form.classList.add('hidden');
     subject.activate();
     subject.focus();
@@ -154,8 +155,17 @@ suite('system/Rocketbar', function() {
   test('handleEvent() - apploading', function() {
     var hideResultsStub = this.sinon.stub(subject, 'hideResults');
     var deactivateStub = this.sinon.stub(subject, 'deactivate');
-    var event = {type: 'apploading'};
-    subject.handleEvent(event);
+
+    // Bug 1071953 - Not called when stayBackground is true.
+    var event1 = {type: 'apploading', detail: {
+      stayBackground: true
+    }};
+    subject.handleEvent(event1);
+    assert.ok(hideResultsStub.notCalled);
+    assert.ok(deactivateStub.notCalled);
+
+    var event2 = {type: 'apploading'};
+    subject.handleEvent(event2);
     assert.ok(hideResultsStub.calledOnce);
     assert.ok(deactivateStub.calledOnce);
   });
@@ -299,6 +309,24 @@ suite('system/Rocketbar', function() {
     assert.ok(hideResultsStub.notCalled);
     subject.searchWindow = null;
 
+    // Bug 1071953 - Not called when showApp is false.
+    window.dispatchEvent(new CustomEvent('open-app', {
+      detail: {
+        showApp: false
+      }
+    }));
+    assert.ok(deactivateStub.notCalled);
+    assert.ok(hideResultsStub.notCalled);
+
+    // Does not hide if the search window is not open.
+    window.dispatchEvent(new CustomEvent('searchclosed'));
+    window.dispatchEvent(new CustomEvent('open-app'));
+    assert.ok(deactivateStub.notCalled);
+    assert.ok(hideResultsStub.notCalled);
+
+    // Hides if the search window is open.
+    window.dispatchEvent(new CustomEvent('searchopened'));
+
     window.dispatchEvent(new CustomEvent('open-app'));
     assert.ok(deactivateStub.calledOnce);
     assert.ok(hideResultsStub.calledOnce);
@@ -419,7 +447,7 @@ suite('system/Rocketbar', function() {
     initSearchConnectionStub.restore();
   });
 
-  test('initSearchConnection()', function() {
+  test('initSearchConnection()', function(done) {
     var handleSearchMessageStub = this.sinon.stub(subject,
       'handleSearchMessage');
     subject._pendingMessage = 'hi';
@@ -437,13 +465,15 @@ suite('system/Rocketbar', function() {
     }};
     subject._port = null;
     navigator.mozApps.getSelf = function() { return app; };
-    subject.initSearchConnection();
-    app.onsuccess();
-    assert.equal(subject._port, 'abc');
-    assert.equal(subject._pendingMessage, null);
-    assert.ok(handleSearchMessageStub.calledOnce);
-    navigator.mozApps = realMozApps;
-    handleSearchMessageStub.restore();
+    subject.initSearchConnection().then(() => {
+      assert.equal(subject._port, 'abc');
+      assert.equal(subject._pendingMessage, null);
+      assert.ok(handleSearchMessageStub.calledOnce);
+      navigator.mozApps = realMozApps;
+      handleSearchMessageStub.restore();
+      done();
+    });
+    app.onsuccess({target: app});
   });
 
   test('handleSearchMessage()', function() {
@@ -535,7 +565,7 @@ suite('system/Rocketbar', function() {
     assert.ok(spy.calledWithNew);
 
     assert.ok(subject.searchWindow instanceof MockSearchWindow);
-    assert.equal(subject._port, 'pending');
+    assert.equal(subject._port, null);
   });
 
   test('open', function() {
@@ -585,16 +615,14 @@ suite('system/Rocketbar', function() {
 
   suite('activate with a transition', function() {
     test('done after transition and search app load', function(done) {
-      this.sinon.spy(subject, 'loadSearchApp');
+      this.sinon.stub(subject, 'loadSearchApp').returns(Promise.resolve());
       subject.activate(done);
-      subject.loadSearchApp.yield();
       subject.backdrop.dispatchEvent(new CustomEvent('transitionend'));
     });
 
     test('done after safety timeout and search app load', function(done) {
-      this.sinon.spy(subject, 'loadSearchApp');
+      this.sinon.stub(subject, 'loadSearchApp').returns(Promise.resolve());
       subject.activate(done);
-      subject.loadSearchApp.yield();
       this.sinon.clock.tick(500);
     });
   });

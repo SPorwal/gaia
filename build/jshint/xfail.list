@@ -12,7 +12,6 @@ apps/browser/test/unit/browser_db_test.js
 apps/callscreen/js/fake-oncall-desktop.js
 apps/callscreen/js/index.js
 apps/callscreen/test/unit/mock_mozbluetooth.js
-apps/communications/dialer/js/index.js
 apps/communications/dialer/js/mmi_ui.js
 apps/communications/dialer/test/marionette/lib/dialer.js
 apps/communications/dialer/test/marionette/navigation_test.js
@@ -425,7 +424,6 @@ apps/system/test/unit/mock_utility_tray.js
 apps/system/test/unit/mock_wifi_manager.js
 apps/system/test/unit/operator_variant_helper_test.js
 apps/system/test/unit/orientation_manager_test.js
-apps/system/test/unit/quick_settings_test.js
 apps/system/test/unit/screen_manager_test.js
 apps/system/test/unit/settings_helper_test.js
 apps/system/test/unit/spin_date_picker_test.js
