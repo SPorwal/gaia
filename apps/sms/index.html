@@ -31,6 +31,12 @@
     <link rel="localization" href="locales/sms.{locale}.properties">
     <link rel="localization" href="/shared/locales/date/date.{locale}.properties">
     <link rel="localization" href="/shared/locales/sim_picker/sim_picker.{locale}.properties">
+    <!-- Firefox Desktop shims -->
+    <script defer src="js/desktop-only/navigator_moz_icc_manager.js"></script>
+    <script defer src="js/desktop-only/navigator_moz_settings.js"></script>
+    <script defer src="js/desktop-only/navigator_moz_mobilemessage.js"></script>
+    <script defer src="js/desktop-only/navigator_moz_contacts.js"></script>
+    <script defer src="js/desktop-only/async_storage.js"></script>
     <!-- Web Components -->
     <script defer src="/shared/elements/config.js"></script>
     <script defer src="/shared/elements/gaia-header/dist/script.js"></script>
@@ -482,7 +488,9 @@
       </label>
       <a href="${hash}">
         <aside role="note" data-l10n-id="${iconLabel}" class="icon icon-unread icon-draft"></aside>
-        <aside role="img" data-l10n-id="contact-photo" aria-label="Contact photo" class="pack-end empty">
+        <aside class="pack-end threadlist-item-picture"
+               role="img" aria-label="Contact photo"
+               data-l10n-id="contact-photo">
           <span data-type="img"></span>
         </aside>
         <p class="name">${number}</p>

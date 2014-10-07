@@ -357,6 +357,10 @@ var Compose = (function() {
       ThreadUI.on('recipientschange', this.updateSendButton.bind(this));
       // Bug 1026384: call updateType as well when the recipients change
 
+      if (Settings.supportEmailRecipient) {
+        ThreadUI.on('recipientschange', this.updateType.bind(this));
+      }
+
       var onInteracted = this.emit.bind(this, 'interact');
 
       dom.message.addEventListener('click', onInteracted);
@@ -425,18 +429,6 @@ var Compose = (function() {
       }, Compose);
 
       this.focus();
-
-      // Put the cursor at the end of the message
-      var selection = window.getSelection();
-      var range = document.createRange();
-      var lastChild = dom.message.lastChild;
-      if (lastChild.tagName === 'BR') {
-        range.setStartBefore(lastChild);
-      } else {
-        range.setStartAfter(lastChild);
-      }
-      selection.removeAllRanges();
-      selection.addRange(range);
     },
 
     /** Render message (sms or mms)
@@ -466,12 +458,10 @@ var Compose = (function() {
             }
           }, this);
           this.ignoreEvents = false;
-          this.focus();
         }.bind(this));
         this.ignoreEvents = true;
       } else {
         this.append(message.body);
-        this.focus();
       }
     },
 
@@ -613,23 +603,36 @@ var Compose = (function() {
 
     focus: function() {
       dom.message.focus();
+
+      // Put the cursor at the end of the message
+      var selection = window.getSelection();
+      var range = document.createRange();
+      var lastChild = dom.message.lastChild;
+      if (lastChild.tagName === 'BR') {
+        range.setStartBefore(lastChild);
+      } else {
+        range.setStartAfter(lastChild);
+      }
+      selection.removeAllRanges();
+      selection.addRange(range);
+
       return this;
     },
 
     updateType: function() {
       var isTextTooLong =
         state.segmentInfo.segments > Settings.maxConcatenatedMessages;
-      /* Bug 1026384: if a recipient is a mail, the type must be MMS
-       * Bug 1040144: replace ThreadUI direct invocation by a instanciation-time
+
+      /* Bug 1040144: replace ThreadUI direct invocation by a instanciation-time
        * property
+       */
       var hasEmailRecipient = ThreadUI.recipients.list.some(
         function(recipient) { return recipient.isEmail; }
       );
-      */
 
       /* Note: in the future, we'll maybe want to force 'mms' from the UI */
       var newType =
-        hasAttachment() || hasSubject() || isTextTooLong ?
+        hasAttachment() || hasSubject() || hasEmailRecipient || isTextTooLong ?
         'mms' : 'sms';
 
       if (newType !== state.type) {

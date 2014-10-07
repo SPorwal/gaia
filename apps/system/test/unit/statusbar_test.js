@@ -204,6 +204,12 @@ suite('system/Statusbar', function() {
   suite('init when FTU is running', function() {
     setup(function() {
       this.sinon.stub(StatusBar, 'finishInit');
+      this.sinon.stub(StatusBar, 'setAppearance');
+    });
+
+    teardown(function() {
+      StatusBar.finishInit.restore();
+      StatusBar.setAppearance.restore();
     });
 
     test('skipping FTU finishes initialization', function() {
@@ -227,6 +233,13 @@ suite('system/Statusbar', function() {
       evt = new CustomEvent('ftudone');
       StatusBar.handleEvent(evt);
       assert.isTrue(StatusBar.finishInit.called);
+    });
+
+    test('handles apptitlestatechanged on ftu', function() {
+      FtuLauncher.mIsUpgrading = false;
+      var evt = new CustomEvent('apptitlestatechanged');
+      StatusBar.handleEvent(evt);
+      assert.isTrue(StatusBar.setAppearance.called);
     });
   });
 
@@ -1982,29 +1995,56 @@ suite('system/Statusbar', function() {
     });
 
     test('setAppearance light and maximized', function() {
-      StatusBar.setAppearance({
-        appChrome: {
-          useLightTheming: function useLightTheming() {
-            return true;
+      var app = {
+        _topWindow: {
+          appChrome: {
+            useLightTheming: function useLightTheming() {
+              return true;
+            },
+            isMaximized: function isMaximized() {
+              return true;
+            }
           },
+        },
+        appChrome: {
           isMaximized: function isMaximized() {
             return true;
           }
+        },
+        getTopMostWindow: function getTopMostWindow() {
+          return this._topWindow;
         }
-      });
+      };
+      var spyTopUseLightTheming = this.sinon.spy(app._topWindow.appChrome,
+                                                 'useLightTheming');
+      var spyTopIsMaximized = this.sinon.spy(app._topWindow.appChrome,
+                                             'isMaximized');
+      var spyParentIsMaximized = this.sinon.spy(app.appChrome, 'isMaximized');
+
+      StatusBar.setAppearance(app);
       assert.isTrue(StatusBar.element.classList.contains('light'));
       assert.isTrue(StatusBar.element.classList.contains('maximized'));
+      assert.isTrue(spyTopUseLightTheming.calledOnce);
+      assert.isFalse(spyTopIsMaximized.called);
+      assert.isTrue(spyParentIsMaximized.calledOnce);
     });
 
     test('setAppearance no appChrome', function() {
-      StatusBar.setAppearance({});
+      StatusBar.setAppearance({
+        getTopMostWindow: function getTopMostWindow() {
+          return this;
+        }
+      });
       assert.isFalse(StatusBar.element.classList.contains('light'));
       assert.isFalse(StatusBar.element.classList.contains('maximized'));
     });
 
     test('setAppearance homescreen', function() {
       StatusBar.setAppearance({
-        isHomescreen: true
+        isHomescreen: true,
+        getTopMostWindow: function getTopMostWindow() {
+          return this;
+        }
       });
       assert.isFalse(StatusBar.element.classList.contains('light'));
       assert.isTrue(StatusBar.element.classList.contains('maximized'));
@@ -2111,11 +2151,21 @@ suite('system/Statusbar', function() {
     });
 
     test('stackchanged', function() {
+      StatusBar.element.classList.add('hidden');
+      assert.isTrue(StatusBar.element.classList.contains('hidden'));
       var event = new CustomEvent('stackchanged');
       StatusBar.handleEvent(event);
       assert.isFalse(StatusBar.element.classList.contains('hidden'));
       assert.isTrue(setAppearanceStub.called);
       assert.isTrue(setAppearanceStub.calledWith(app));
+    });
+
+    test('sheets-gesture-end', function() {
+      StatusBar.element.classList.add('hidden');
+      assert.isTrue(StatusBar.element.classList.contains('hidden'));
+      var event = new CustomEvent('sheets-gesture-end');
+      StatusBar.handleEvent(event);
+      assert.isFalse(StatusBar.element.classList.contains('hidden'));
     });
 
     test('homescreenopening', function() {
@@ -2140,6 +2190,61 @@ suite('system/Statusbar', function() {
 
     test('apptitlestatechanged', function() {
       testEventThatShows.bind(this)('apptitlestatechanged');
+    });
+
+    test('activityopened', function() {
+      testEventThatShows.bind(this)('activityopened');
+    });
+  });
+
+  suite('Label icon width', function() {
+    var labelIndex;
+    var realClientWidth;
+
+    setup(function() {
+      StatusBar.PRIORITIES.some(function(iconObj, index) {
+        if (iconObj[0] === 'label') {
+          labelIndex = index;
+          return true;
+        }
+
+        return false;
+      });
+      realClientWidth = Object.getOwnPropertyDescriptor(fakeIcons.label,
+        'clientWidth');
+    });
+
+    teardown(function() {
+      if (realClientWidth) {
+        Object.defineProperty(fakeIcons.label, 'clientWidth', realClientWidth);
+      } else {
+        delete fakeIcons.label.clientWidth;
+      }
+    });
+
+    test('should be cached after initialisation', function() {
+      assert.isNotNull(StatusBar.PRIORITIES[labelIndex][1]);
+      assert.isNumber(StatusBar.PRIORITIES[labelIndex][1]);
+    });
+
+    test('should have the cache invalidated when width changes', function() {
+      var label = fakeIcons.label;
+
+      Object.defineProperty(label, 'clientWidth', {
+        configurable: true,
+        get: function() { return 10; }
+      });
+      StatusBar.update.time.call(StatusBar, '*');
+
+      var originalWidth = StatusBar.PRIORITIES[labelIndex][1];
+
+      Object.defineProperty(label, 'clientWidth', {
+        configurable: true,
+        get: function() { return 20; }
+      });
+      StatusBar.update.time.call(StatusBar, '***');
+
+      assert.notEqual(originalWidth, StatusBar.PRIORITIES[labelIndex][1]);
     });
   });
 });

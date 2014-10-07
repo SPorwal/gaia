@@ -55,9 +55,9 @@ var StatusBar = {
     ['mute', 16 + 4],
     ['call-forwardings', null], // Width can change
     ['playing', 16 + 4],
-    ['headphones', 16 + 4]
-    //['sms' 16 + 4], // Not currently implemented.
-    //['label' 16 + 4], // Only visible in the maximized status bar.
+    ['headphones', 16 + 4],
+    //['sms', 16 + 4], // Not currently implemented.
+    ['label', null] // Only visible in the maximized status bar.
   ],
 
   /* Timeout for 'recently active' indicators */
@@ -165,6 +165,7 @@ var StatusBar = {
     window.addEventListener('ftudone', this);
     window.addEventListener('ftuskip', this);
     window.addEventListener('ftuopen', this);
+    window.addEventListener('apptitlestatechanged', this);
   },
 
   addSettingsListener: function sb_addSettingsListener(settingKey) {
@@ -283,10 +284,11 @@ var StatusBar = {
 
     window.addEventListener('appopening', this);
     window.addEventListener('appopened', this);
+    window.addEventListener('activityopened', this);
     window.addEventListener('homescreenopening', this);
     window.addEventListener('homescreenopened', this);
     window.addEventListener('sheets-gesture-begin', this);
-    window.addEventListener('apptitlestatechanged', this);
+    window.addEventListener('sheets-gesture-end', this);
     window.addEventListener('stackchanged', this);
 
     // We need to preventDefault on mouse events until
@@ -505,6 +507,10 @@ var StatusBar = {
         this.element.classList.add('hidden');
         break;
 
+      case 'sheets-gesture-end':
+        this.element.classList.remove('hidden');
+        break;
+
       case 'stackchanged':
         this.setAppearance(AppWindowManager.getActiveApp());
         this.element.classList.remove('hidden');
@@ -513,6 +519,7 @@ var StatusBar = {
       case 'apptitlestatechanged':
       case 'appopened':
       case 'homescreenopened':
+      case 'activityopened':
         this.setAppearance(evt.detail);
         this.element.classList.remove('hidden');
         break;
@@ -526,8 +533,10 @@ var StatusBar = {
       return;
     }
 
+    // Fetch top-most window to figure out color theming.
+    var top = app.getTopMostWindow();
     this.element.classList.toggle('light',
-      !!(app.appChrome && app.appChrome.useLightTheming())
+      !!(top.appChrome && top.appChrome.useLightTheming())
     );
 
     this.element.classList.toggle('maximized', app.isHomescreen ||
@@ -613,17 +622,23 @@ var StatusBar = {
     }.bind(this));
   },
 
-  _getIconWidth: function(iconObj) {
+  _getIconWidth: function sb_getIconWidth(iconObj) {
     var iconWidth = iconObj[1];
 
     if (!iconWidth) {
       // The width of this icon is not static.
       var icon = this.icons[this.toCamelCase(iconObj[0])];
-      var style = window.getComputedStyle(icon);
-      iconWidth = icon.clientWidth +
-        parseInt(style.marginLeft, 10) +
-        parseInt(style.marginRight, 10);
+      iconWidth = this._getWidthFromDomElementWidth(icon);
     }
+
+    return iconWidth;
+  },
+
+  _getWidthFromDomElementWidth: function sb_getWidthFromDomElementWidth(icon) {
+    var style = window.getComputedStyle(icon);
+    var iconWidth = icon.clientWidth +
+      parseInt(style.marginLeft, 10) +
+      parseInt(style.marginRight, 10);
 
     return iconWidth;
   },
@@ -907,7 +922,9 @@ var StatusBar = {
         conn = conns[0];
       }
 
+      var self = this;
       var label = this.icons.label;
+      var previousLabelContent = label.textContent;
       var l10nArgs = JSON.parse(label.dataset.l10nArgs || '{}');
 
       if (!conn || !conn.voice || !conn.voice.connected ||
@@ -917,6 +934,10 @@ var StatusBar = {
 
         label.dataset.l10nId = '';
         label.textContent = l10nArgs.date;
+
+        if (previousLabelContent !== label.textContent) {
+          updateLabelWidth();
+        }
 
         return;
       }
@@ -932,6 +953,22 @@ var StatusBar = {
 
       label.dataset.l10nId = 'statusbarLabel';
       label.textContent = navigator.mozL10n.get('statusbarLabel', l10nArgs);
+
+      if (previousLabelContent !== label.textContent) {
+        updateLabelWidth();
+      }
+
+      // Update the width of the date element. Called when the content changed.
+      function updateLabelWidth() {
+        self.PRIORITIES.some(function(iconObj) {
+          if (iconObj[0] === 'label') {
+            iconObj[1] = self._getWidthFromDomElementWidth(label);
+            return true;
+          }
+
+          return false;
+        });
+      }
     },
 
     time: function sb_updateTime(now) {

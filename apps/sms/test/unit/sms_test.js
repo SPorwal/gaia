@@ -1,5 +1,5 @@
 /*global MocksHelper, MockL10n, MockGestureDetector, MockDialog,
-         loadBodyHTML, ThreadUI, MessageManager, MockNavigatormozMobileMessage,
+         loadBodyHTML, ThreadUI, MessageManager,
          ThreadListUI, Contacts, MockContact, MockThreadList,
          MockThreadMessages, getMockupedDate, Utils */
 /*
@@ -16,7 +16,6 @@ require('/shared/test/unit/mocks/mock_gesture_detector.js');
 require('/shared/test/unit/mocks/mock_l10n.js');
 requireApp('sms/test/unit/mock_contact.js');
 requireApp('sms/test/unit/mock_time_headers.js');
-requireApp('sms/test/unit/mock_navigatormoz_sms.js');
 requireApp('sms/test/unit/mock_attachment_menu.js');
 requireApp('sms/test/unit/mock_information.js');
 requireApp('sms/test/unit/mock_dialog.js');
@@ -78,7 +77,6 @@ suite('SMS App Unit-Test', function() {
   }
 
   var nativeMozL10n = navigator.mozL10n;
-  var realMozMobileMessage;
   var realGestureDetector;
 
   suiteSetup(function() {
@@ -125,12 +123,9 @@ suite('SMS App Unit-Test', function() {
     // ...And render
     ThreadUI.init();
     ThreadListUI.init();
-    realMozMobileMessage = ThreadUI._mozMobileMessage;
-    ThreadUI._mozMobileMessage = MockNavigatormozMobileMessage;
   });
 
   suiteTeardown(function() {
-    ThreadUI._mozMobileMessage = realMozMobileMessage;
     // cleanup
     window.document.body.innerHTML = '';
   });
@@ -197,7 +192,6 @@ suite('SMS App Unit-Test', function() {
     // Setup. We need an async. way due to threads are rendered
     // async.
     setup(function(done) {
-      this.sinon.spy(navigator.mozL10n, 'setAttributes');
       ThreadListUI.renderThreads(done);
       _tci = ThreadListUI.checkInputs;
     });
@@ -275,21 +269,22 @@ suite('SMS App Unit-Test', function() {
         assertNumOfElementsByClass(ThreadListUI.container, 1, 'unread');
       });
 
-      test('Update thread with contact name localized', function() {
+      test('Update thread with contact name', function() {
         // Given a number, we should retrieve the contact and update the info
         var threadWithContact = document.getElementById('thread-1');
-        var contactName = threadWithContact.getElementsByClassName('name')[0];
-        sinon.assert.calledWith(
-          navigator.mozL10n.setAttributes,
-          contactName,
-          'thread-header-text',
-          { name: 'Pepito O\'Hare', n: 0 }
+        assert.equal(
+          threadWithContact.querySelector('.name').textContent,
+          'Pepito O\'Hare'
         );
       });
     });
 
     // Review the edit-mode functionality and markup
     suite('Threads-list edit mode', function() {
+
+      setup(function() {
+        this.sinon.stub(ThreadListUI, 'setContact');
+      });
 
       test('Check edit mode form', function() {
         var container = ThreadListUI.container;
@@ -446,6 +441,7 @@ suite('SMS App Unit-Test', function() {
       // Setup for getting all messages rendered before every test
       setup(function(done) {
         this.sinon.spy(ThreadUI, 'checkInputs');
+        this.sinon.stub(ThreadListUI, 'setContact');
         ThreadUI.renderMessages(1, function() {
           done();
         });

@@ -163,13 +163,17 @@ BUILD_APP_NAME=$(APP)
 endif
 endif
 
-REPORTER?=spec
 # BUILDAPP variable defines the target b2g platform (eg desktop, device)
 # and exports it for the gaia-marionette script
 BUILDAPP?=desktop
 export BUILDAPP
 # Ensure that NPM only logs warnings and errors
 export npm_config_loglevel=warn
+ifneq ($(BUILDAPP),desktop)
+REPORTER?=mocha-socket-reporter
+MARIONETTE_RUNNER_HOST?=marionette-socket-host
+endif
+REPORTER?=spec
 MARIONETTE_RUNNER_HOST?=marionette-b2gdesktop-host
 TEST_MANIFEST?=./shared/test/integration/local-manifest.json
 MOZPERFOUT?=""
@@ -729,11 +733,11 @@ ifndef APPS
 endif
 
 b2g: node_modules/.bin/mozilla-download
-	DEBUG=* ./node_modules/.bin/mozilla-download  \
-		--verbose \
-		--product b2g \
-		--channel tinderbox \
-		--branch mozilla-central $@
+	DEBUG=* ./node_modules/.bin/mozilla-download \
+	--verbose \
+	--product b2g \
+	--channel tinderbox \
+	--branch mozilla-central $@
 
 .PHONY: test-integration
 # $(PROFILE_FOLDER) should be `profile-test` when we do `make test-integration`.
@@ -756,7 +760,7 @@ test-integration-test:
 
 .PHONY: caldav-server-install
 caldav-server-install:
-	source tests/travis_ci/venv.sh; \
+	source tests/ci/venv.sh; \
 				export LC_ALL=en_US.UTF-8; \
 				export LANG=en_US.UTF-8; \
 				pip install radicale;
@@ -1020,10 +1024,10 @@ really-clean: clean
 	test -d .git && cp tools/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit || true
 
 build-test-unit: $(NPM_INSTALLED_PROGRAMS)
-	@$(call run-build-test, $(shell find build/test/unit/*.test.js))
+	./bin/build-test $(shell find build/test/unit/*.test.js)
 
 build-test-integration: $(NPM_INSTALLED_PROGRAMS)
-	@$(call run-build-test, $(shell find build/test/integration/*.test.js))
+	./bin/build-test $(shell find build/test/integration/*.test.js)
 
 build-test-unit-coverage: $(NPM_INSTALLED_PROGRAMS)
 	@$(call run-build-coverage,build/test/unit)

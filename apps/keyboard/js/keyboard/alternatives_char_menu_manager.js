@@ -15,7 +15,6 @@ var AlternativesCharMenuManager = function(app) {
   this.isShown = false;
 
   this._originalTarget = null;
-  this._hasMovedAwayFromOriginalTarget = false;
   this._menuAreaTop =
     this._menuAreaLeft =
     this._menuAreaRight =
@@ -37,7 +36,8 @@ AlternativesCharMenuManager.prototype.show = function(target) {
   }
 
   // Get the targetRect before menu is shown.
-  var targetRect = target.getBoundingClientRect();
+  var targetRect =
+    IMERender.getDomElemFromTargetObject(target).getBoundingClientRect();
 
   // XXX: Remove reference to IMERender in the global in the future.
   this._currentMenuView = IMERender.showAlternativesCharMenu(target,
@@ -45,7 +45,6 @@ AlternativesCharMenuManager.prototype.show = function(target) {
   this.isShown = true;
 
   this._originalTarget = target;
-  this._hasMovedAwayFromOriginalTarget = false;
 
   // XXX: We probably introduced a sync reflow here.
   var menuRect = this._currentMenuView.getBoundingClientRect();
@@ -71,21 +70,21 @@ AlternativesCharMenuManager.prototype.show = function(target) {
 };
 
 AlternativesCharMenuManager.prototype._getAlternativesForTarget =
-function _getAlternativesForTarget(target) {
+function _getAlternativesForTarget(key) {
   // Handle key alternatives
   var alternatives;
   var altMap = this.app.layoutManager.currentPage.alt;
   var origKey = null;
 
   if (this.app.upperCaseStateManager.isUpperCaseLocked) {
-    origKey = target.dataset.uppercaseValue;
+    origKey = key.uppercaseValue;
     alternatives = altMap[origKey].upperCaseLocked ||
                    altMap[origKey];
   } else if (this.app.upperCaseStateManager.isUpperCase) {
-    origKey = target.dataset.uppercaseValue;
+    origKey = key.uppercaseValue;
     alternatives = altMap[origKey];
   } else {
-    origKey = target.dataset.lowercaseValue;
+    origKey = key.lowercaseValue;
     alternatives = altMap[origKey];
   }
 
@@ -106,7 +105,6 @@ AlternativesCharMenuManager.prototype.hide = function() {
   this.isShown = false;
 
   this._originalTarget = null;
-  this._hasMovedAwayFromOriginalTarget = false;
   this._menuAreaTop =
     this._menuAreaLeft =
     this._menuAreaRight =
@@ -119,9 +117,8 @@ AlternativesCharMenuManager.prototype.isMenuTarget = function(target) {
     return false;
   }
 
-  var menuContainer = this._currentMenuView.getMenuContainer();
-  return (target.parentNode === menuContainer ||
-          target === menuContainer);
+  return (IMERender.getDomElemFromTargetObject(target).parentNode ===
+          this._currentMenuView.getMenuContainer());
 };
 
 AlternativesCharMenuManager.prototype.getMenuTarget = function(press) {
@@ -129,19 +126,6 @@ AlternativesCharMenuManager.prototype.getMenuTarget = function(press) {
     throw new Error('AlternativesCharMenuManager: ' +
       'getMenuTarget called but menu is not shown');
   }
-
-  var menuContainer = this._currentMenuView.getMenuContainer();
-  var children = menuContainer.children;
-  // If the press.target is still the original target, we should always
-  // return the first alternative (the one on top of the key).
-  if (!this._hasMovedAwayFromOriginalTarget &&
-      press.target === this._originalTarget) {
-    // Return the alternative right on the top of the target key.
-    // The alternative should always be the first element in the DOM.
-    return children[0];
-  }
-
-  this._hasMovedAwayFromOriginalTarget = true;
 
   return this._currentMenuView.getMenuTarget(press.clientX, press.clientY);
 };

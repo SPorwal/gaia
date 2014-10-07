@@ -11,31 +11,22 @@
  */
 // XXX: The only thing worth to be remebered is the KEY element must be the
 // deepest interactive HTML element on the hierarchy or, if none, simply the
-// deepest element. This element must contain dataset-keycode and related
-// attributes.
+// deepest element. This element must be mapped in LayoutRenderingManager's
+// _domObjectMap in order to retrieve the key object defined and normalized in
+// layouts and to access its attributes.
 var IMERender = (function() {
 
   var ime, activeIme;
   var alternativesCharMenu = null;
   var _menuKey = null;
+  var renderingManager = null;
+  var currentDrawnKeyboardClass = null;
 
-  // Return the upper value for a key object
-  var getUpperCaseValue = function getUpperCaseValue(key, layout) {
-    var hasSpecialCode = SPECIAL_CODES.indexOf(key.keyCode) > -1;
-    if (key.keyCode < 0 || hasSpecialCode || key.compositeKey)
-      return key.value;
-
-    var upperCase = layout.upperCase || {};
-    return upperCase[key.value] || key.value.toUpperCase();
-  };
-
-  // Support function for render
-  var isSpecialKey = function isSpecialKeyObj(key) {
-    var hasSpecialCode = key.keyCode !== KeyEvent.DOM_VK_SPACE &&
-      key.keyCode &&
-      SPECIAL_CODES.indexOf(key.keyCode) !== -1;
-    return hasSpecialCode || key.keyCode <= 0;
-  };
+  // a WeakMap to map target key object onto the DOM element it's associated
+  // with; essentially the revrse mapping of |renderingManager._domObjectMap|.
+  // ideally this should only be accessed by this renderer and alt_char_menu's
+  // view.
+  var targetObjDomMap = null;
 
   var layoutWidth = 10;
 
@@ -46,14 +37,6 @@ var IMERender = (function() {
 
   var cachedWindowHeight = -1;
   var cachedWindowWidth = -1;
-
-  var SPECIAL_CODES = [
-    KeyEvent.DOM_VK_BACK_SPACE,
-    KeyEvent.DOM_VK_CAPS_LOCK,
-    KeyEvent.DOM_VK_RETURN,
-    KeyEvent.DOM_VK_ALT,
-    KeyEvent.DOM_VK_SPACE
-  ];
 
   var ARIA_LABELS = {
     '⇪': 'upperCaseKey2',
@@ -81,11 +64,15 @@ var IMERender = (function() {
   // Initialize the render. It needs some business logic to determine:
   //   1- The uppercase for a key object
   //   2- When a key is a special key
-  var init = function kr_init() {
+  var init = function kr_init(layoutRenderingManager) {
     ime = document.getElementById('keyboard');
+
+    renderingManager = layoutRenderingManager;
 
     cachedWindowHeight = window.innerHeight;
     cachedWindowWidth = window.innerWidth;
+
+    targetObjDomMap = new WeakMap();
   };
 
   var setInputMethodName = function(name) {
@@ -149,6 +136,8 @@ var IMERender = (function() {
       ('' + flags.uppercase).substr(0, 1),
       supportsSwitching
     ].join('-');
+
+    currentDrawnKeyboardClass = keyboardClass;
 
     // lets see if we have this keyboard somewhere already...
     var container = document.getElementsByClassName(keyboardClass)[0];
@@ -220,8 +209,6 @@ var IMERender = (function() {
       }
 
       row.forEach((function buildKeyboardColumns(key) {
-        var keyChar = key.value;
-
         // Keys may be hidden if the .hidden property contains the inputType
         if (key.hidden && key.hidden.indexOf(flags.inputType) !== -1)
           return;
@@ -230,18 +217,10 @@ var IMERender = (function() {
         if (key.visible && key.visible.indexOf(flags.inputType) === -1)
           return;
 
-        // We will always display keys in uppercase, per request from UX.
-        var upperCaseKeyChar = getUpperCaseValue(key, layout);
-
-        // Handle override
-        var code = key.keyCode || keyChar.charCodeAt(0);
-        // Uppercase keycode
-        var upperCode = key.keyCode || upperCaseKeyChar.charCodeAt(0);
-
         var attributeList = [];
         var className = '';
 
-        if (isSpecialKey(key)) {
+        if (key.isSpecialKey) {
           className = 'special-key';
         } else {
           // The 'key' role tells an assistive technology that these buttons
@@ -265,15 +244,9 @@ var IMERender = (function() {
         var ratio = key.ratio || 1;
         rowLayoutWidth += ratio;
 
-        var outputChar = flags.uppercase ? upperCaseKeyChar : keyChar;
+        var outputChar = flags.uppercase ? key.uppercaseValue : key.value;
 
         var keyWidth = placeHolderWidth * ratio;
-        var dataset = [];
-        dataset.push({'key': 'keycode', 'value': code});
-        dataset.push({'key': 'keycodeUpper', 'value': upperCode});
-        if (key.compositeKey) {
-          dataset.push({'key': 'compositeKey', 'value': key.compositeKey});
-        }
 
         if (key.disabled) {
           attributeList.push({
@@ -294,26 +267,24 @@ var IMERender = (function() {
           });
         }
 
-        if (key.longPressValue) {
-          var longPressKeyCode = key.longPressKeyCode ||
-            key.longPressValue.charCodeAt(0);
-          dataset.push({'key': 'longPressValue', 'value': key.longPressValue });
-          dataset.push({'key': 'longPressKeyCode', 'value': longPressKeyCode });
+        var keyElement = buildKey(outputChar, className, keyWidth + 'px',
+          key, key.longPressValue, attributeList);
+
+        // a few dataset properties are retained in bug 1044525 because some css
+        // and ui/integration tests rely on them.
+        // also to not break them we spell keycode instead of keyCode in dataset
+        keyElement.dataset.keycode = key.keyCode;
+        keyElement.dataset.keycodeUpper = key.keyCodeUpper;
+        if ('targetPage' in key) {
+          keyElement.dataset.targetPage = key.targetPage;
+        }
+        if ('compositeKey' in key) {
+          keyElement.dataset.compositeKey = key.compositeKey;
         }
 
-        if (code === KeyboardEvent.DOM_VK_ALT) {
-          if (!('targetPage' in key)) {
-            console.error('render.js: no targetPage for switching key.');
-          }
+        kbRow.appendChild(keyElement);
 
-          dataset.push({'key': 'targetPage', 'value': key.targetPage });
-        }
-
-        dataset.push({'key': 'lowercaseValue', 'value': keyChar });
-        dataset.push({'key': 'uppercaseValue', 'value': upperCaseKeyChar });
-
-        kbRow.appendChild(buildKey(outputChar, className, keyWidth + 'px',
-          dataset, key.longPressValue, attributeList));
+        setDomElemTargetObject(keyElement, key);
       }));
 
       kbRow.dataset.layoutWidth = rowLayoutWidth;
@@ -340,20 +311,23 @@ var IMERender = (function() {
 
   // Highlight the key according to the case.
   var highlightKey = function kr_updateKeyHighlight(key, options) {
+    var keyElem = getDomElemFromTargetObject(key);
+
     options = options || {};
 
-    key.classList.add('highlighted');
+    keyElem.classList.add('highlighted');
 
     // Show lowercase pop.
     if (!options.showUpperCase) {
-      key.classList.add('lowercase');
+      keyElem.classList.add('lowercase');
     }
   };
 
   // Unhighlight a key
   var unHighlightKey = function kr_unHighlightKey(key) {
-    key.classList.remove('highlighted');
-    key.classList.remove('lowercase');
+    var keyElem = getDomElemFromTargetObject(key);
+    keyElem.classList.remove('highlighted');
+    keyElem.classList.remove('lowercase');
   };
 
   var toggleCandidatePanel = function(expand) {
@@ -445,8 +419,17 @@ var IMERender = (function() {
 
           var span = fitText(div, text);
           span.setAttribute('role', 'option');
-          span.dataset.selection = true;
+          // TODO: the renderer should not be creating a business logic object,
+          // let's move it to somewhere else.
+          setDomElemTargetObject(span, {
+            selection: true,
+            text: span.textContent,
+            data: data
+          });
+
+          // ui/integration test needs this
           span.dataset.data = data;
+
           if (correction)
             span.classList.add('autocorrect');
 
@@ -558,9 +541,17 @@ var IMERender = (function() {
 
       var span = document.createElement('span');
       span.textContent = cand;
-      span.dataset.selection = true;
-      span.dataset.data = data;
+      // TODO: the renderer should not be creating a business logic object,
+      // let's move it to somewhere else.
+      setDomElemTargetObject(span, {
+        selection: true,
+        text: span.textContent,
+        data: data
+      });
       span.style.width = (unit * candidateUnitWidth - 2) + 'px';
+
+      // ui/integration test needs this
+      span.dataset.data = data;
 
       nowUnit += unit;
 
@@ -614,14 +605,15 @@ var IMERender = (function() {
       ARIA_LABELS: ARIA_LABELS,
       buildKey: buildKey,
       keyWidth: keyWidth,
-      screenInPortraitMode: screenInPortraitMode
+      screenInPortraitMode: screenInPortraitMode,
+      renderingManager: renderingManager
     };
 
     alternativesCharMenu = new AlternativesCharMenuView(activeIme,
                                                         altChars,
                                                         renderer);
     alternativesCharMenu.show(key);
-    key.classList.add('kbr-menu-on');
+    getDomElemFromTargetObject(key).classList.add('kbr-menu-on');
     _menuKey = key;
 
     return alternativesCharMenu;
@@ -630,7 +622,7 @@ var IMERender = (function() {
   // Hide the alternative menu
   var hideAlternativesCharMenu = function km_hideAlternativesCharMenu() {
     alternativesCharMenu.hide();
-    _menuKey.classList.remove('kbr-menu-on');
+    getDomElemFromTargetObject(_menuKey).classList.remove('kbr-menu-on');
   };
 
   var _keyArray = []; // To calculate proximity info for predictive text
@@ -685,7 +677,7 @@ var IMERender = (function() {
         for (var k = 0, key; key = row.childNodes[k]; k++) {
           var visualKey = key.querySelector('.visual-wrapper');
           _keyArray.push({
-            code: key.dataset.keycode | 0,
+            code: renderingManager.getTargetObject(key).keyCode,
             x: visualKey.offsetLeft,
             y: visualKey.offsetTop,
             width: visualKey.clientWidth,
@@ -764,24 +756,10 @@ var IMERender = (function() {
   // to be applied as dataset
   //*
 
-  // Explicit call to mozL10n to translate the generated DOM element
-  // to be removed once bug 992473 lands.
-  var translateElement = function(el) {
-    if (!navigator.mozL10n || navigator.mozL10n.readyState !== 'complete') {
-      // mozL10n is not loaded or ready yet. Our elements in the DOM tree
-      // will automatically be localized by it when it's ready.
-      // Return early here.
-      return;
-    }
-
-    navigator.mozL10n.translate(el);
-  };
-
   var candidatePanelCode = function() {
     var candidatePanel = document.createElement('div');
     candidatePanel.setAttribute('role', 'group');
     candidatePanel.dataset.l10nId = 'wordSuggestions2';
-    translateElement(candidatePanel);
 
     candidatePanel.classList.add('keyboard-candidate-panel');
     if (inputMethodName)
@@ -792,7 +770,6 @@ var IMERender = (function() {
     dismissButton.classList.add('hide');
     dismissButton.setAttribute('role', 'button');
     dismissButton.dataset.l10nId = 'dismiss2';
-    translateElement(dismissButton);
     candidatePanel.appendChild(dismissButton);
 
     var suggestionContainer = document.createElement('div');
@@ -800,13 +777,25 @@ var IMERender = (function() {
     suggestionContainer.setAttribute('role', 'listbox');
     candidatePanel.appendChild(suggestionContainer);
 
+    // TODO: the renderer should not be creating a business logic object,
+    // let's move it to somewhere else.
+    setDomElemTargetObject(dismissButton, {isDismissSuggestionsButton: true});
+
     return candidatePanel;
   };
 
   var candidatePanelToggleButtonCode = function() {
     var toggleButton = document.createElement('span');
     toggleButton.classList.add('keyboard-candidate-panel-toggle-button');
-    toggleButton.dataset.keycode = -4;
+    // we're not getting reference of LayoutManager, so define this manually
+    var KEYCODE_TOGGLE_CANDIDATE_PANEL = -4;
+
+    // TODO: the renderer should not be creating a bussiness logic object,
+    // let's move it to somewhere else.
+    setDomElemTargetObject(toggleButton, {
+      keyCode: KEYCODE_TOGGLE_CANDIDATE_PANEL
+    });
+
     if (inputMethodName) {
       toggleButton.classList.add(inputMethodName);
     }
@@ -818,7 +807,7 @@ var IMERender = (function() {
     return toggleButton;
   };
 
-  var buildKey = function buildKey(label, className, width, dataset, altNote,
+  var buildKey = function buildKey(label, className, width, key, altNote,
                                    attributeList) {
     var altNoteNode;
     if (altNote) {
@@ -834,16 +823,8 @@ var IMERender = (function() {
     if (attributeList) {
       attributeList.forEach(function(attribute) {
         contentNode.setAttribute(attribute.key, attribute.value);
-
-        if (attribute.key === 'data-l10n-id') {
-          translateElement(contentNode);
-        }
       });
     }
-
-    dataset.forEach(function(data) {
-      contentNode.dataset[data.key] = data.value;
-    });
 
     var vWrapperNode = document.createElement('span');
     vWrapperNode.className = 'visual-wrapper';
@@ -863,7 +844,7 @@ var IMERender = (function() {
     vWrapperNode.appendChild(labelNode);
 
     labelNode = document.createElement('span');
-    labelNode.innerHTML = contentNode.dataset.lowercaseValue;
+    labelNode.innerHTML = key.lowercaseValue;
     labelNode.className = 'lowercase popup';
     vWrapperNode.appendChild(labelNode);
 
@@ -928,6 +909,24 @@ var IMERender = (function() {
     var candidatePanelHeight = candidatePanel ? candidatePanel.clientHeight : 0;
 
     return Math.ceil((ime.clientHeight - candidatePanelHeight) / rowCount);
+  };
+
+  // a helper function to set both rendering manager's forward map,
+  // and renderer's reverse map.
+  // ideally this should only be used with views (renderer & alt_char_menu.js).
+  var setDomElemTargetObject = function setDomElemTargetObject(elem, obj) {
+    renderingManager.domObjectMap.set(elem, obj);
+    var domElemDict = targetObjDomMap.get(obj) || {};
+    domElemDict[currentDrawnKeyboardClass] = elem;
+    targetObjDomMap.set(obj, domElemDict);
+  };
+
+  // a helper function to set both rendering manager's forward map,
+  // and renderer's reverse map.
+  // ideally this should only be used with views (render.js & ./js/views/*).
+  var getDomElemFromTargetObject = function getDomElemFromTargetObject(obj) {
+    var domElemDict = targetObjDomMap.get(obj) || {};
+    return domElemDict[currentDrawnKeyboardClass];
   };
 
   // Measure the width of the element, and return the scale that
@@ -999,6 +998,8 @@ var IMERender = (function() {
     'getKeyWidth': getKeyWidth,
     'getKeyHeight': getKeyHeight,
     'getScale': getScale,
+    'setDomElemTargetObject': setDomElemTargetObject,
+    'getDomElemFromTargetObject': getDomElemFromTargetObject,
     'showMoreCandidates': showMoreCandidates,
     'toggleCandidatePanel': toggleCandidatePanel,
     'isFullCandidataPanelShown': isFullCandidataPanelShown,
