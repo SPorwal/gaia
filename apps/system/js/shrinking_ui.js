@@ -25,7 +25,7 @@
  *
  */
 
-/* globals dump, Promise, AppWindowManager */
+/* globals dump, Promise, System */
 (function(exports) {
   var ShrinkingUI = function() {
     this._clearPreviousTilting = false;
@@ -60,7 +60,7 @@
 
     get current() {
       if (!this._clearPreviousTilting || !this.state.activeApp) {
-        var currentApp = AppWindowManager && AppWindowManager.getActiveApp();
+        var currentApp = System.currentApp;
         if (!currentApp) {
           return null;
         }
@@ -427,7 +427,7 @@
       tip.id = 'shrinking-tip';
       tipArrow.id = 'shrinking-tip-arrow';
       tipArrow.textContent = '\u00A0';
-      tip.textContent = navigator.mozL10n.get('shrinking-tip');
+      tip.setAttribute('data-l10n-id', 'shrinking-tip');
       tip.appendChild(tipArrow);
       return tip;
     };

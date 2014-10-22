@@ -174,6 +174,22 @@ suite('STK (icc) >', function() {
     });
   });
 
+  test('hide views when home button pressed and visible', function() {
+    this.sinon.stub(icc, 'hideViews');
+    icc.icc_view.classList.add('visible');
+    var event = new CustomEvent('home');
+    icc.handleEvent(event);
+    assert.isTrue(icc.hideViews.called);
+    icc.icc_view.classList.remove('visible');
+  });
+
+  test('does not hide when home and not visible', function() {
+    this.sinon.stub(icc, 'hideViews');
+    var event = new CustomEvent('home');
+    icc.handleEvent(event);
+    assert.isFalse(icc.hideViews.called);
+  });
+
   test('responseSTKCommand', function(done) {
     window.icc.getIcc('1010011010').sendStkResponse = function(msg, res) {
       assert.equal(res, 'dummy');
@@ -290,9 +306,13 @@ suite('STK (icc) >', function() {
 
     assert.equal(document.getElementById('icc-input-msg').textContent,
       testCmd.command.options.text);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength -
-      testCmd.command.options.defaultText.length) + ')');
+
+    var l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.equal(l10nAttrs.id, 'okCharsLeft');
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      testCmd.command.options.defaultText.length) });
     assert.equal(document.getElementById('icc-input-btn').disabled, false);
     assert.equal(document.getElementById('icc-input-btn_help').textContent,
       'Help');
@@ -321,38 +341,63 @@ suite('STK (icc) >', function() {
     inputbox.value = '';
     inputbox.dispatchEvent(event);
     assert.equal(button.disabled, true);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength - inputbox.value.length) + ')');
+
+    var l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.equal(l10nAttrs.id, 'okCharsLeft');
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      inputbox.value.length) });
 
     inputbox.value = '1';
     inputbox.dispatchEvent(event);
     assert.equal(button.disabled, true);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength - inputbox.value.length) + ')');
+
+    l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      inputbox.value.length) });
 
     inputbox.value = '12';
     inputbox.dispatchEvent(event);
     assert.equal(button.disabled, false);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength - inputbox.value.length) + ')');
+
+    l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      inputbox.value.length) });
 
     inputbox.value = '123';
     inputbox.dispatchEvent(event);
     assert.equal(button.disabled, false);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength - inputbox.value.length) + ')');
+
+    l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      inputbox.value.length) });
 
     inputbox.value = '1234567890';
     inputbox.dispatchEvent(event);
     assert.equal(button.disabled, false);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength - inputbox.value.length) + ')');
+
+    l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      inputbox.value.length) });
 
     inputbox.value = '12345678901';
     inputbox.dispatchEvent(event);
     assert.equal(button.disabled, true);
-    assert.equal(document.getElementById('icc-input-btn').textContent, 'ok (' +
-      (testCmd.command.options.maxLength - inputbox.value.length) + ')');
+
+    l10nAttrs = navigator.mozL10n.getAttributes(
+      document.getElementById('icc-input-btn'));
+
+    assert.deepEqual(l10nAttrs.args, { n: (testCmd.command.options.maxLength -
+      inputbox.value.length) });
   });
 
   test('launchStkCommand: STK_CMD_DISPLAY_TEXT', function(done) {

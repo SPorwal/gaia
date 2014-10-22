@@ -1,4 +1,4 @@
-/* global Bluetooth, AppWindowManager, IACHandler */
+/* global Bluetooth, IACHandler, appWindowManager */
 
 'use strict';
 
@@ -93,22 +93,27 @@ MediaPlaybackWidget.prototype = {
       track.push(artist);
     }
     track = track.join(' — '); // Using a &mdash; here.
-    this.track.textContent = track || navigator.mozL10n.get('UnknownTrack');
+    if (track) {
+      this.track.removeAttribute('data-l10n-id');
+      this.track.textContent = track;
+    } else {
+      this.track.setAttribute('data-l10n-id', 'UnknownTrack');
+    }
   },
 
   updatePlaybackStatus: function mp_updatePlaybackStatus(status) {
-    var _ = navigator.mozL10n.get;
     switch (status.playStatus) {
       case 'PLAYING':
         this.hidden = false;
         this.playPauseButton.dataset.icon = 'pause';
-        this.playPauseButton.setAttribute('aria-label',
-          _('mediaPlaybackPause'));
+        this.playPauseButton.setAttribute('data-l10n-id',
+          'mediaPlaybackPause');
         break;
       case 'PAUSED':
         this.hidden = false;
         this.playPauseButton.dataset.icon = 'play';
-        this.playPauseButton.setAttribute('aria-label', _('mediaPlaybackPlay'));
+        this.playPauseButton.setAttribute('data-l10n-id',
+          'mediaPlaybackPlay');
         break;
       case 'STOPPED':
         this.hidden = true;
@@ -124,7 +129,7 @@ MediaPlaybackWidget.prototype = {
       var evt = new CustomEvent('displayapp', {
         bubbles: true,
         cancelable: true,
-        detail: AppWindowManager.getApp(this.origin)
+        detail: appWindowManager.getApp(this.origin)
       });
       window.dispatchEvent(evt);
     }

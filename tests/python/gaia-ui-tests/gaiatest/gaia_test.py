@@ -541,7 +541,7 @@ class GaiaDevice(object):
         time.sleep(2)
         self.start_b2g()
 
-    def start_b2g(self, timeout=60):
+    def start_b2g(self, timeout=120):
         if self.marionette.instance:
             # launch the gecko instance attached to marionette
             self.marionette.instance.start()
@@ -557,7 +557,7 @@ class GaiaDevice(object):
         # Reset the storage path for desktop B2G
         self._set_storage_path()
 
-    def wait_for_b2g_ready(self, timeout=60):
+    def wait_for_b2g_ready(self, timeout=120):
         # Wait for the homescreen to finish loading
         Wait(self.marionette, timeout).until(expected.element_present(
             By.CSS_SELECTOR, '#homescreen[loading-state=false]'))
@@ -785,6 +785,7 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
         self.device.file_manager.remove('/data/local/OfflineCache')
         self.device.file_manager.remove('/data/local/permissions.sqlite')
         self.device.file_manager.remove('/data/local/storage/persistent')
+        self.device.file_manager.remove('/data/local/webapps')
         # remove remembered networks
         self.device.file_manager.remove('/data/misc/wifi/wpa_supplicant.conf')
 

@@ -19,6 +19,10 @@
 }
 */
 
+#screen > #system-update-splash {
+  z-index: 65538;
+}
+
 /* Home gesture panel should not be covered by any element of system */
 #screen > #bottom-panel.visible {
   z-index: 2147483647;
@@ -122,6 +126,10 @@
 
 
 /* Level 4: Attention window */
+#screen > [data-z-index-level="permission-screen"] {
+  z-index: 8194;
+}
+
 #screen > [data-z-index-level="app"] > .appWindow.attentionWindow.active.top-most {
   z-index: 8193;
 }
@@ -130,12 +138,8 @@
   z-index: 8192;
 }
 
-/* Level 5: Activity menu, context menu, value selector, and permissions */
+/* Level 5: Activity menu, context menu, value selector */
 #screen > [data-z-index-level="action-menu"] {
-  z-index: 4096;
-}
-
-#screen > [data-z-index-level="permission-screen"] {
   z-index: 4096;
 }
 
@@ -154,6 +158,13 @@
 {
   /* Or the .appWindow one would be first adopted.*/
   z-index: 4098 !important;
+}
+
+/* Need raise zIndex when in normal mode, or the animation would be hidden */
+#screen > [data-z-index-level="app"] > .lockScreenInputWindow
+{
+  /* Or the .appWindow one would be first adopted.*/
+  z-index: 2049 !important;
 }
 
 #screen > [data-z-index-level="app"] > .lockScreenWindow.active
@@ -243,7 +254,7 @@
 }
 
 #screen > [data-z-index-level="app"] > .appWindow.active:not(.homescreen):not(.attentionWindow),
-#screen > [data-z-index-level="app"] > .appWindow:not(.homescreen):not(.lockScreenWindow):not(.attentionWindow),
+#screen > [data-z-index-level="app"] > .appWindow:not(.homescreen):not(.lockScreenWindow):not(.attentionWindow):not(.lockScreenInputWindow),
 #screen > [data-z-index-level="app"] > .appWindow.will-become-active {
   z-index: 6;
 }

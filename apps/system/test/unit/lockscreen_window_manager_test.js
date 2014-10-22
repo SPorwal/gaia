@@ -2,12 +2,11 @@
 'use strict';
 
 requireApp('system/shared/test/unit/mocks/mock_manifest_helper.js');
+requireApp('system/shared/test/unit/mocks/mock_system.js');
 requireApp('system/shared/test/unit/mocks/mock_navigator_moz_settings.js');
 requireApp('system/test/unit/mock_lock_screen.js');
 requireApp('system/test/unit/mock_lockscreen_window.js');
 requireApp('system/js/lockscreen_window_manager.js');
-
-mocha.globals(['MozActivity', 'AppWindowManager', 'SettingsListener']);
 
 var mocksForLockScreenWindowManager = new window.MocksHelper([
   'LockScreen', 'LockScreenWindow'
@@ -17,7 +16,6 @@ suite('system/LockScreenWindowManager', function() {
   var stubById;
   var appFake;
   var originalSettingsListener;
-  var originalAppWindowManager;
   var originalMozActivity;
   var originalMozSettings;
 
@@ -29,7 +27,6 @@ suite('system/LockScreenWindowManager', function() {
     appFake = new window.LockScreenWindow();
 
     originalSettingsListener = window.SettingsListener;
-    originalAppWindowManager = window.AppWindowManager;
     originalMozActivity = window.MozActivity;
     window.SettingsListener = {
       observe: function(name, bool, cb) {},
@@ -40,9 +37,6 @@ suite('system/LockScreenWindowManager', function() {
           }
         }};
       }
-    };
-    window.AppWindowManager = {
-      getActiveApp: function() {}
     };
     window.MozActivity = function() {};
 
@@ -74,7 +68,6 @@ suite('system/LockScreenWindowManager', function() {
   teardown(function() {
     window.SettingsListener = originalSettingsListener;
     window.MozActivity = originalMozActivity;
-    window.AppWindowManager = originalAppWindowManager;
     window.navigator.mozSettings = originalMozSettings;
     window.MockNavigatorSettings.mTeardown();
     stubById.restore();
@@ -112,11 +105,14 @@ suite('system/LockScreenWindowManager', function() {
 
     test('Initialize when screenchange', function() {
       var originalCreateWindow = window.lockScreenWindowManager.createWindow;
+      var originalLockScreenInputWindow = window.LockScreenInputWindow;
+      window.LockScreenInputWindow = function() {};
       var stubCreateWindow =
       this.sinon.stub(window.lockScreenWindowManager, 'createWindow',
         function() {
           return originalCreateWindow.bind(this).call();
         });
+      window.lockScreenWindowManager.states.ready = true;
       window.lockScreenWindowManager.handleEvent(
         { type: 'screenchange',
           detail: { screenEnabled: true } });
@@ -127,12 +123,15 @@ suite('system/LockScreenWindowManager', function() {
         window.lockScreenWindowManager.unregisterApp(app);
       }
       window.lockScreenWindowManager.stopEventListeners();
+      window.LockScreenInputWindow = originalLockScreenInputWindow =
+        originalLockScreenInputWindow;
     });
 
     test('Screenchange by proximity sensor, should not open the LockScreen app',
     function() {
       var stubOpenApp = this.sinon.stub(window.lockScreenWindowManager,
         'openApp');
+      window.lockScreenWindowManager.states.ready = true;
       window.lockScreenWindowManager.handleEvent(
         {
           type: 'screenchange',
@@ -148,6 +147,7 @@ suite('system/LockScreenWindowManager', function() {
     test('Open the app when screen is turned on', function() {
       window.lockScreenWindowManager.registerApp(appFake);
       var stubOpen = this.sinon.stub(appFake, 'open');
+      window.lockScreenWindowManager.states.ready = true;
       window.lockScreenWindowManager.handleEvent(
         { type: 'screenchange',
           detail: { screenEnabled: true } });
@@ -167,7 +167,20 @@ suite('system/LockScreenWindowManager', function() {
     test('When FTU occurs, the window should not be instantiated', function() {
       var stubOpenApp = this.sinon.stub(window.lockScreenWindowManager,
         'openApp');
+      window.lockScreenWindowManager.states.ready = true;
       window.lockScreenWindowManager.handleEvent({ type: 'ftuopen' });
+      window.lockScreenWindowManager.handleEvent(
+        { type: 'screenchange',
+          detail: { screenEnabled: true } });
+      assert.isFalse(stubOpenApp.called,
+        'the LockScreenWindow still be instantiated while the FTU is opened');
+    });
+
+    test('When the lockscreen settings is not ready, ' +
+          'the window should not be instantiated', function() {
+      var stubOpenApp = this.sinon.stub(window.lockScreenWindowManager,
+        'openApp');
+      window.lockScreenWindowManager.states.ready = false;
       window.lockScreenWindowManager.handleEvent(
         { type: 'screenchange',
           detail: { screenEnabled: true } });
@@ -180,6 +193,7 @@ suite('system/LockScreenWindowManager', function() {
         'openApp');
       window.lockScreenWindowManager.handleEvent({ type: 'ftuopen' });
       window.lockScreenWindowManager.handleEvent({ type: 'ftudone' });
+      window.lockScreenWindowManager.states.ready = true;
       window.lockScreenWindowManager.handleEvent(
         { type: 'screenchange',
           detail: { screenEnabled: true } });
@@ -212,9 +226,6 @@ suite('system/LockScreenWindowManager', function() {
       var evt = { type: 'lockscreen-request-unlock' },
           stubCloseApp = this.sinon.stub(window.lockScreenWindowManager,
             'closeApp');
-      this.sinon.stub(window.AppWindowManager, 'getActiveApp', function() {
-        return null;
-      });
       window.lockScreenWindowManager.handleEvent(evt);
       assert.isTrue(stubCloseApp.called,
         'it did\'t close the window while unlock request arrive');
@@ -228,6 +239,18 @@ suite('system/LockScreenWindowManager', function() {
       assert.isTrue(stubOpen.called,
         'the manager didn\'t open the app when requested');
       window.lockScreenWindowManager.unregisterApp(appFake);
+    });
+
+    test('onInputpadOpen would open the window and call resize', function() {
+      window.lockScreenWindowManager.states.instance = appFake;
+      appFake.inputWindow = {
+        open: this.sinon.stub(),
+        close: this.sinon.stub()
+      };
+      var stubResize = this.sinon.stub(appFake, 'resize');
+      window.lockScreenWindowManager.onInputpadClose();
+      assert.isTrue(appFake.inputWindow.close.called, 'called no |open|');
+      assert.isTrue(stubResize.called, 'called no |resize|');
     });
   });
 });

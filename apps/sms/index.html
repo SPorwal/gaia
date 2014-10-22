@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="style/root.css">
     <!-- Stable Building blocks -->
     <link rel="stylesheet" type="text/css" href="shared/style/action_menu.css">
+    <link rel="stylesheet" type="text/css" href="shared/style/option_menu.css">
     <link rel="stylesheet" type="text/css" href="shared/style/buttons.css">
     <link rel="stylesheet" type="text/css" href="shared/style/confirm.css">
     <link rel="stylesheet" type="text/css" href="shared/style/edit_mode.css">
@@ -39,9 +40,9 @@
     <script defer src="js/desktop-only/async_storage.js"></script>
     <!-- Web Components -->
     <script defer src="/shared/elements/config.js"></script>
-    <script defer src="/shared/elements/gaia-header/dist/script.js"></script>
-    <link rel="stylesheet" type="text/css" href="/shared/elements/gaia-theme/style.css" />
-    <!-- <link rel="stylesheet" type="text/css" href="/shared/elements/gaia-icons/style.css" /> -->
+    <!-- <link rel="stylesheet" type="text/css" href="/shared/elements/gaia-icons/gaia-icons.css" /> -->
+    <link rel="stylesheet" type="text/css" href="app://theme.gaiamobile.org/shared/elements/gaia-theme/gaia-theme.css" />
+    <script defer src="/shared/elements/gaia-header/dist/gaia-header.js"></script>
     <!-- Shared code -->
     <script defer src="shared/js/l10n.js"></script>
     <script defer src="shared/js/l10n_date.js"></script>
@@ -58,6 +59,7 @@
     <script defer src="shared/js/fb/fb_reader_utils.js"></script>
     <script defer src="js/navigation.js"></script>
     <script defer src="js/event_dispatcher.js"></script>
+    <script defer src="js/iac/event_dispatcher.js"></script>
     <script defer src="js/time_headers.js"></script>
     <script defer src="js/contacts.js"></script>
     <script defer src="js/drafts.js"></script>
@@ -79,6 +81,7 @@
     <script defer src="shared/js/multi_sim_action_button.js"></script>
     <script defer src="shared/js/option_menu.js"></script>
     <script defer src="shared/js/image_utils.js"></script>
+    <script defer src="js/iac/shared_worker.js"></script>
     <script defer src="js/errors.js"></script>
     <script defer src="js/shared_components.js"></script>
     <script defer src="js/dialog.js"></script>
@@ -222,35 +225,31 @@
         <article id="information-report" class="view-body article-list report-view hide" data-type="list">
           <div class="description">
             <p class="type"></p>
-            <p class="subject"></p>
-          </div>
-          <div class="sent-detail">
-            <p class="datetime l10n-contains-date"></p>
-            <div class="status-container">
-              <span class="status"></span>
-              <aside></aside>
-            </div>
+            <p class="subject">
+              <span data-l10n-id="message-subject"></span>
+              <span class="detail"></span>
+            </p>
+            <p class="sent-block">
+              <span class="sent-title"></span>
+              <span class="sent-timestamp l10n-contains-date detail"></span>
+            </p>
+            <p class="received-block">
+              <span data-l10n-id="message-received"></span>
+              <span class="received-timestamp l10n-contains-date detail"></span>
+            </p>
+            <p class="size-block">
+              <span data-l10n-id="message-size-was"></span>
+              <span class="size detail"></span>
+            </p>
+            <p class="sim-info hide">
+              <span data-l10n-id="message-via"></span>
+              <span class="sim-detail detail"></span>
+            </p>
           </div>
           <span class="contact-title"></span>
           <ul class="contact-list"></ul>
-          <div class="received-detail">
-            <div class="sent-timestamp-label">
-              <span data-l10n-id="message-sent"></span>
-              <span class="sent-timeStamp l10n-contains-date"></span>
-            </div>
-            <div>
-              <span data-l10n-id="message-received"></span>
-              <span class="received-timeStamp l10n-contains-date"></span>
-            </div>
-          </div>
-          <div class="sim-info hide">
-            <span data-l10n-id="message-via"></span>
-            <span class="sim-detail"></span>
-          </div>
-          <div class="size-block">
-            <span data-l10n-id="message-size-was"></span>
-            <span class="size"></span>
-          </div>
+          <button class="resend-btn" data-l10n-id="message-resend">
+          </button>
         </article>
         <article id="composer-container" class="view-body">
           <div class="flex-composer">
@@ -298,7 +297,7 @@
           </menu>
         </form>
         <section id="messages-recipient-suggestions" class="article-list hide" data-type="list">
-          <ul class="contact-list" role="listbox"></ul>
+          <ul class="contact-list recipient-suggestions-list" role="listbox"></ul>
         </section>
       </section>
     </article>
@@ -314,7 +313,7 @@
       </form>
     </article>
 
-    <menu id="attachment-options-menu" class="hide" tabindex="-1">
+    <menu id="attachment-options-menu" tabindex="-1">
       <div>
         <form id="attachment-options" role="dialog" data-type="action">
           <header></header>
@@ -355,7 +354,7 @@
         ${photoHTML}
         <p class="name">${phoneDetailsHTML}</p>
         <p class="number">
-          <span data-l10n-id="${type}">Unknown Contact</span>
+          <span data-l10n-id="unknown-contact-title">Unknown Contact</span>
         </p>
      </a>
     </li>
@@ -396,22 +395,13 @@
 
     <div id="information-report-tmpl" class="hide">
       <!--
-      <p class="${deliveryClass}">
-        <span data-l10n-id="message-delivered"></span>
-        <span class="l10n-contains-date" data-l10n-id="${deliveryL10n}"
-              data-l10n-date="${deliveryTimestamp}"
-              data-l10n-date-format12="${messageL10nDateFormat12}"
-              data-l10n-date-format24="${messageL10nDateFormat24}"
-              >${deliveryDateL10n}</span>
-      </p>
-      <p class="${readClass}">
-        <span data-l10n-id="message-read-title"></span>
-        <span class="l10n-contains-date" data-l10n-id="${readL10n}"
-              data-l10n-date="${readTimestamp}"
-              data-l10n-date-format12="${messageL10nDateFormat12}"
-              data-l10n-date-format24="${messageL10nDateFormat24}"
-              >${readDateL10n}</span>
-      </p>
+      <span class="icon"></span>
+      <span data-l10n-id="${titleL10n}"></span>
+      <span class="timestamp l10n-contains-date"
+            data-l10n-date="${timestamp}"
+            data-l10n-date-format12="${messageL10nDateFormat12}"
+            data-l10n-date-format24="${messageL10nDateFormat24}"
+            >${reportDateL10n}</span>
       -->
     </div>
 

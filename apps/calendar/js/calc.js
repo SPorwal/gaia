@@ -1,16 +1,9 @@
-(function(exports) {
+define(function(require, exports) {
 'use strict';
 
-/**
- * Module dependencies
- */
-/*var Timespan = Calendar.Timespan;*/
-var compare = Calendar.compare;
-/*var localeFormat = Calendar.App.dateFormat.localeFormat;*/
+var Timespan = require('timespan');
+var compare = require('compare');
 
-/**
- * Constants
- */
 const SECOND = 1000;
 const MINUTE = (SECOND * 60);
 const HOUR = MINUTE * 60;
@@ -143,7 +136,8 @@ exports.hoursOfOccurence = function(day, start, end) {
   var startBefore = start <= refStart;
   var endsAfter = end >= refEnd;
 
-  if (startBefore && endsAfter) {
+  // yahoo sets start/end dates to same value for recurring all day events
+  if (startBefore && endsAfter || Number(start) === Number(end)) {
     return [exports.ALLDAY];
   }
 
@@ -210,7 +204,7 @@ exports.spanOfDay = function(date, includeTime) {
 
   var end = exports.createDay(date);
   end.setDate(end.getDate() + 1);
-  return new Calendar.Timespan(date, end);
+  return new Timespan(date, end);
 };
 
 /**
@@ -236,7 +230,7 @@ exports.spanOfMonth = function(month) {
 
   endDay.setMilliseconds(-1);
   endDay = exports.getWeekEndDate(endDay);
-  return new Calendar.Timespan(startDay, endDay);
+  return new Timespan(startDay, endDay);
 };
 
 /**
@@ -469,6 +463,15 @@ exports.getWeekEndDate = function(date) {
  * @param {Boolean} includeTime include times start/end ?
  */
 exports.daysBetween = function(start, end, includeTime) {
+  if (start instanceof Timespan) {
+    if (end) {
+      includeTime = end;
+    }
+
+    end = new Date(start.end);
+    start = new Date(start.start);
+  }
+
   if (start > end) {
     var tmp = end;
     end = start;
@@ -638,9 +641,18 @@ exports.relativeDuration = function(baseDate, startDate, endDate) {
  */
 exports.isAllDay = function(startDate, endDate) {
   var dayDiff = exports.dayDiff(startDate, endDate);
-  return exports.relativeTime(startDate) === 0 &&
-    exports.relativeTime(endDate) === 0 &&
-    dayDiff > 0 && Number.isInteger(dayDiff);
+  var isFullDayDiff = dayDiff > 0 && Number.isInteger(dayDiff);
+  return exports.isStartOfDay(startDate) && exports.isStartOfDay(endDate) && (
+      // yahoo uses same start/end date for recurring all day events!!!
+      isFullDayDiff || Number(startDate) === Number(endDate)
+    );
+};
+
+/**
+ * Checks if date is the start of the day.
+ */
+exports.isStartOfDay = function(date) {
+  return exports.relativeTime(date) === 0;
 };
 
 /**
@@ -655,7 +667,6 @@ exports.relativeTime = function(date) {
 
 window.addEventListener('localized', function changeStartDay() {
   var startDay = navigator.mozL10n.get('weekStartsOnMonday');
-
   if (startDay && parseInt(startDay, 10)) {
     exports.startsOnMonday = true;
   } else {
@@ -663,4 +674,4 @@ window.addEventListener('localized', function changeStartDay() {
   }
 });
 
-}(Calendar.Calc = {}));
+});

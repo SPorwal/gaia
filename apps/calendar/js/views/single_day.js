@@ -1,10 +1,12 @@
-Calendar.ns('Views').SingleDay = (function() {
+define(function(require, exports, module) {
 'use strict';
 
-var dayObserver = Calendar.dayObserver;
-var isAllDay = Calendar.Calc.isAllDay;
-var relativeDuration = Calendar.Calc.relativeDuration;
-var relativeOffset = Calendar.Calc.relativeOffset;
+var Overlap = require('utils/overlap');
+var dateFormat = require('date_format');
+var dayObserver = require('day_observer');
+var isAllDay = require('calc').isAllDay;
+var relativeDuration = require('calc').relativeDuration;
+var relativeOffset = require('calc').relativeOffset;
 
 function SingleDay(config) {
   this.date = config.date;
@@ -12,30 +14,30 @@ function SingleDay(config) {
   this._daysHolder = config.daysHolder;
   this._alldaysHolder = config.alldaysHolder;
   this._render = this._render.bind(this);
-  this.overlaps = new Calendar.Utils.Overlap();
+  this.overlaps = new Overlap();
 }
+module.exports = SingleDay;
 
 SingleDay.prototype = {
-
   _isActive: false,
   _borderWidth: 0.1,
   _attached: false,
 
   setup: function() {
     this.day = document.createElement('div');
-    this.day.className = 'day';
+    this.day.className = 'md__day';
     this.day.dataset.date = this.date;
 
     this.allday = document.createElement('div');
-    this.allday.className = 'allday';
+    this.allday.className = 'md__allday';
     this.allday.dataset.date = this.date;
 
     this._dayName = document.createElement('h1');
-    this._dayName.className = 'day-name';
+    this._dayName.className = 'md__day-name';
     this.allday.appendChild(this._dayName);
 
     this._alldayEvents = document.createElement('div');
-    this._alldayEvents.className = 'allday-events';
+    this._alldayEvents.className = 'md__allday-events';
     this.allday.appendChild(this._alldayEvents);
 
     this._updateDayName();
@@ -46,7 +48,7 @@ SingleDay.prototype = {
   _updateDayName: function() {
     // we can't use [data-l10n-date-format] because format might change
     var format = window.navigator.mozL10n.get('week-day');
-    this._dayName.textContent = Calendar.App.dateFormat.localeFormat(
+    this._dayName.textContent = dateFormat.localeFormat(
       this.date,
       format
     );
@@ -104,7 +106,7 @@ SingleDay.prototype = {
     el.style.height = hei + 'px';
 
     if (duration < 1) {
-      el.classList.add('partial-hour');
+      el.classList.add('is-partial');
       var size = '';
       // we need to toggle layout if event lasts less than 20, 30 and 45min
       if (duration < 0.3) {
@@ -115,7 +117,7 @@ SingleDay.prototype = {
         size = 'small';
       }
       if (size) {
-        el.classList.add('partial-hour-' + size);
+        el.classList.add('is-partial-' + size);
       }
     }
 
@@ -133,21 +135,21 @@ SingleDay.prototype = {
     var el = document.createElement('a');
     el.href = '/event/show/' + busytime._id;
     el.className = [
-      'event',
+      'md__event',
       'calendar-id-' + event.calendarId,
       'calendar-border-color',
       'calendar-bg-color'
     ].join(' ');
 
     var title = document.createElement('span');
-    title.className = 'event-title';
+    title.className = 'md__event-title';
     // since we use "textContent" there is no risk of XSS
     title.textContent = remote.title;
     el.appendChild(title);
 
     if (remote.location) {
       var location = document.createElement('span');
-      location.className = 'event-location';
+      location.className = 'md__event-location';
       // since we use "textContent" there is no risk of XSS
       location.textContent = remote.location;
       el.appendChild(location);
@@ -190,9 +192,6 @@ SingleDay.prototype = {
     window.removeEventListener('localized', this);
     this._isActive = false;
   }
-
 };
 
-return SingleDay;
-
-}());
+});

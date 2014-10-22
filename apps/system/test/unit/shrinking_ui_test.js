@@ -4,13 +4,11 @@
 
 requireApp('system/js/shrinking_ui.js');
 requireApp('system/test/unit/mock_orientation_manager.js');
-requireApp('system/test/unit/mock_app_window_manager.js');
 requireApp('system/test/unit/mock_app_window.js');
 require('/shared/test/unit/mocks/mock_system.js');
 
 var mocksForshrinkingUI = new MocksHelper([
   'AppWindow',
-  'AppWindowManager',
   'OrientationManager',
   'System'
 ]).init();
@@ -39,11 +37,11 @@ suite('system/shrinkingUI', function() {
     shrinkingUI.start();
     fakeApp = new window.AppWindow(fakeAppConfig);
     fakeBrowserApp = new window.AppWindow(fakeBrowserAppConfig);
-    window.AppWindowManager.mActiveApp = fakeApp;
+    window.System.currentApp = fakeApp;
   });
 
   teardown(function() {
-    window.AppWindowManager.mActiveApp = null;
+    window.System.currentApp = null;
   });
 
   function createTouchEvent(type, target, x, y) {
@@ -681,10 +679,7 @@ suite('system/shrinkingUI', function() {
 
     assert.equal(tip.tagName.toLowerCase(), 'div');
     assert.equal(tip.id, 'shrinking-tip');
-    assert.equal(
-      tip.textContent,
-      navigator.mozL10n.get('shrinking-tip') + tipArrow.textContent
-    );
+    assert.equal(tip.getAttribute('data-l10n-id'), 'shrinking-tip');
     assert.equal(tipArrow.tagName.toLowerCase(), 'div');
     assert.equal(tipArrow.id, 'shrinking-tip-arrow');
     assert.equal(tipArrow.textContent, '\u00A0');

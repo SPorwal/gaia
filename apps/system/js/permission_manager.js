@@ -1,4 +1,4 @@
-/* global LazyLoader, AppWindowManager, applications, ManifestHelper*/
+/* global LazyLoader, System, applications, ManifestHelper*/
 /* global Template*/
 'use strict';
 (function(exports) {
@@ -248,6 +248,7 @@
           break;
         case 'fullscreenoriginchange':
           delete this.overlay.dataset.type;
+          this.cleanDialog();
           this.handleFullscreenOriginChange(detail);
           break;
       }
@@ -255,7 +256,9 @@
       switch (evt.type) {
         case 'attentionopened':
         case 'attentionopening':
-          this.discardPermissionRequest();
+          if (this.currentOrigin !== evt.detail.origin) {
+            this.discardPermissionRequest();
+          }
           break;
       }
     },
@@ -300,7 +303,7 @@
         this.cancelRequest(this.fullscreenRequest);
         this.fullscreenRequest = undefined;
       }
-      if (detail.fullscreenorigin !== AppWindowManager.getActiveApp().origin) {
+      if (detail.fullscreenorigin !== System.currentApp.origin) {
         var _ = navigator.mozL10n.get;
         // The message to be displayed on the approval UI.
         var message =
@@ -338,18 +341,25 @@
         message = _(permissionID + '-appRequest',
           { 'app': new ManifestHelper(app.manifest).name });
 
-        this.title.innerHTML = _('title-app');
         if (this.isCamSelector) {
-          this.title.innerHTML = _('title-cam');
+          this.title.setAttribute('data-l10n-id', 'title-cam');
+        } else {
+          this.title.setAttribute('data-l10n-id', 'title-app');
         }
-        this.deviceSelector.innerHTML = _('perm-camera-selector-appRequest',
-            { 'app': new ManifestHelper(app.manifest).name });
+        navigator.mozL10n.setAttributes(
+          this.deviceSelector,
+          'perm-camera-selector-appRequest',
+          { 'app': new ManifestHelper(app.manifest).name }
+        );
       } else { // Web content
         message = _(permissionID + '-webRequest', { 'site': detail.origin });
 
-        this.title.innerHTML = _('title-web');
-        this.deviceSelector.innerHTML = _('perm-camera-selector-webRequest',
-            { 'site': detail.origin });
+        this.title.setAttribute('data-l10n-id', 'title-web');
+        navigator.mozL10n.setAttributes(
+          this.deviceSelector,
+          'perm-camera-selector-webRequest',
+          { 'site': detail.origin }
+        );
       }
 
       var moreInfoText = _(permissionID + '-more-info');
@@ -568,15 +578,14 @@
       var isSharedPermission = this.isVideo || this.isAudio ||
            this.permissionType === 'geolocation';
 
-      var _ = navigator.mozL10n.get;
-      this.yes.textContent =
-        isSharedPermission ? _('share-' + this.permissionType) : _('allow');
+      this.yes.setAttribute('data-l10n-id',
+        isSharedPermission ? 'share-' + this.permissionType : 'allow');
       this.yesHandler = this.clickHandler.bind(this);
       this.yes.addEventListener('click', this.yesHandler);
       this.yes.callback = yescallback;
 
-      this.no.textContent = isSharedPermission ?
-          _('dontshare-' + this.permissionType) : _('dontallow');
+      this.no.setAttribute('data-l10n-id', isSharedPermission ?
+        'dontshare-' + this.permissionType : 'dontallow');
       this.noHandler = this.clickHandler.bind(this);
       this.no.addEventListener('click', this.noHandler);
       this.no.callback = nocallback;
@@ -587,7 +596,7 @@
         this.rememberSection.style.display = 'none';
         this.buttons.dataset.items = 1;
         this.no.style.display = 'none';
-        this.yes.textContent = _('ok');
+        this.yes.setAttribute('data-l10n-id', 'ok');
       }
       // Make the screen visible
       this.overlay.classList.add('visible');

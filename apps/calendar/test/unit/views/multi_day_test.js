@@ -1,10 +1,9 @@
-requireLib('template.js');
-requireLib('templates/date_span.js');
-requireLib('views/multi_day.js');
+define(function(require) {
+'use strict';
 
-suiteGroup('Views.MultiDay', function() {
-  'use strict';
+var MultiDay = require('views/multi_day');
 
+suite('Views.MultiDay', function() {
   var app;
   var subject;
 
@@ -13,9 +12,9 @@ suiteGroup('Views.MultiDay', function() {
   });
 
   setup(function() {
-    subject = new Calendar.Views.MultiDay({app: app});
+    subject = new MultiDay({app: app});
     subject.element = document.createElement('div');
-    subject.element.innerHTML = '<div class="sidebar"></div>';
+    subject.element.innerHTML = '<div class="md__sidebar"></div>';
     subject._currentTime = {
       refresh: this.sinon.spy()
     };
@@ -30,10 +29,10 @@ suiteGroup('Views.MultiDay', function() {
     var i = -1, date = new Date(), hour;
     while (++i < 24) {
       date.setHours(i, 0, 0, 0);
-      hour = sidebar.querySelector('.hour-' + i);
+      hour = sidebar.querySelector('.md__hour-' + i);
       assert.equal(hour.textContent, i, 'display hour');
       assert.equal(
-        hour.querySelector('.display-hour').dataset.date,
+        hour.querySelector('.md__display-hour').dataset.date,
         date,
         'date data'
       );
@@ -70,5 +69,6 @@ suiteGroup('Views.MultiDay', function() {
       'selectedDay'
     );
   });
+});
 
 });

@@ -122,6 +122,12 @@ LayoutRenderingManager.prototype.updateLayoutRendering = function() {
     this.app.layoutManager.currentPage;
   var currentIMEngine = this.app.inputMethodManager.currentIMEngine;
 
+  this.app.console.log('needsCandidatePanel',
+    currentPage.autoCorrectLanguage, currentPage.needsCandidatePanel,
+    typeof currentIMEngine.displaysCandidates !== 'function',
+    (currentIMEngine.displaysCandidates &&
+      currentIMEngine.displaysCandidates()));
+
   // Determine if the candidate panel for word suggestion is needed
   var needsCandidatePanel = !!(
     (currentPage.autoCorrectLanguage || currentPage.needsCandidatePanel) &&
@@ -218,12 +224,17 @@ LayoutRenderingManager.prototype._updateHeight = function() {
 };
 
 LayoutRenderingManager.prototype.getTargetObject = function (elem) {
+  this.app.console.log(
+    'LayoutRenderingManager.getTargetObject()', elem);
   if (!elem) {
     return {};
   }
 
+  var target = this.domObjectMap.get(elem);
+  this.app.console.log('target=', target,
+                       'prototype=', target && Object.getPrototypeOf(target));
   // default to an empty object such that member accessing and 'in' won't fail
-  return this.domObjectMap.get(elem) || {};
+  return target || {};
 };
 
 exports.LayoutRenderingManager = LayoutRenderingManager;
